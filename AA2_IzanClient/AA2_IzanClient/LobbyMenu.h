@@ -1,7 +1,6 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
-#include <iostream>
 #include <string>
 
 class LobbyMenu {
@@ -12,6 +11,7 @@ private:
     std::string roomCode;
     bool boxActive;
     bool inRoom;
+    int myPlayerID;
 
 public:
     LobbyMenu();
@@ -19,4 +19,6 @@ public:
     void update(sf::RenderWindow& window);
     void draw(sf::RenderWindow& window);
     bool isRoomReady() const;
+    std::string getRoomCode() const;
+    int getPlayerID() const;
 };

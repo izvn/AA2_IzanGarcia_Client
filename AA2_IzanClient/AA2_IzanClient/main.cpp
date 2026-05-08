@@ -28,6 +28,7 @@ int main() {
             else if (currentState == AppState::LOBBY) {
                 lobbyMenu.handleEvent(*event, window);
                 if (lobbyMenu.isRoomReady()) {
+                    gameScreen.setRoomData(lobbyMenu.getRoomCode(), lobbyMenu.getPlayerID());
                     currentState = AppState::GAME;
                 }
             }
