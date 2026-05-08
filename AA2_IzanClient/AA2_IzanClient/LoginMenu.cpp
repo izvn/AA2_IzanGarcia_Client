@@ -1,78 +1,125 @@
 #include "LoginMenu.h"
 
-// FÍJATE AQUÍ: Añadimos los dos puntos (:) y pasamos la 'font' a todos los textos
 LoginMenu::LoginMenu()
-    : titleText(font), loginText(font), registerText(font), userLabel(font), passLabel(font)
+    : titleText(font), loginText(font), registerText(font), userLabel(font),
+    passLabel(font), displayUser(font), displayPass(font)
 {
-    // 1. Cargar la fuente (Si falla, avisamos por consola)
+    activeBox = 0;
+
     if (!font.openFromFile("assets/arial.ttf")) {
-        std::cerr << "Error: No se pudo cargar la fuente arial.ttf\n";
+        std::cerr << "Error cargando fuente\n";
     }
 
-    // 2. Configurar el Título (Ya no hace falta usar setFont aquí)
     titleText.setString("3 EN RAYA ONLINE");
     titleText.setCharacterSize(40);
-    titleText.setFillColor(sf::Color::White);
-    titleText.setPosition(sf::Vector2f(220.f, 50.f));
+    titleText.setPosition({ 220.f, 50.f });
 
-    // 3. Configurar Cajas de Texto (Fondos blancos)
-    userBox.setSize(sf::Vector2f(300.f, 40.f));
-    userBox.setPosition(sf::Vector2f(250.f, 150.f));
+    userBox.setSize({ 300.f, 40.f });
+    userBox.setPosition({ 250.f, 150.f });
     userBox.setFillColor(sf::Color::White);
 
-    passBox.setSize(sf::Vector2f(300.f, 40.f));
-    passBox.setPosition(sf::Vector2f(250.f, 250.f));
+    passBox.setSize({ 300.f, 40.f });
+    passBox.setPosition({ 250.f, 250.f });
     passBox.setFillColor(sf::Color::White);
 
-    // 4. Etiquetas de las cajas (Quitamos setFont)
+    loginButton.setSize({ 140.f, 50.f });
+    loginButton.setPosition({ 250.f, 350.f });
+    loginButton.setFillColor(sf::Color(0, 150, 255));
+
+    registerButton.setSize({ 140.f, 50.f });
+    registerButton.setPosition({ 410.f, 350.f });
+    registerButton.setFillColor(sf::Color(0, 200, 0));
+
     userLabel.setString("Nickname:");
-    userLabel.setCharacterSize(20);
-    userLabel.setFillColor(sf::Color::White);
-    userLabel.setPosition(sf::Vector2f(250.f, 120.f));
-
-    passLabel.setString("Contrasena:"); // Evitamos la 'ñ'
-    passLabel.setCharacterSize(20);
-    passLabel.setFillColor(sf::Color::White);
-    passLabel.setPosition(sf::Vector2f(250.f, 220.f));
-
-    // 5. Configurar Botones
-    loginButton.setSize(sf::Vector2f(140.f, 50.f));
-    loginButton.setPosition(sf::Vector2f(250.f, 350.f));
-    loginButton.setFillColor(sf::Color(0, 150, 255)); // Azul claro
-
-    registerButton.setSize(sf::Vector2f(140.f, 50.f));
-    registerButton.setPosition(sf::Vector2f(410.f, 350.f));
-    registerButton.setFillColor(sf::Color(0, 200, 0)); // Verde
-
-    // Textos de los botones (Quitamos setFont)
+    userLabel.setPosition({ 250.f, 120.f });
+    passLabel.setString("Contrasena:");
+    passLabel.setPosition({ 250.f, 220.f });
     loginText.setString("LOGIN");
-    loginText.setCharacterSize(20);
-    loginText.setFillColor(sf::Color::White);
-    loginText.setPosition(sf::Vector2f(285.f, 360.f));
-
+    loginText.setPosition({ 285.f, 360.f });
     registerText.setString("REGISTRO");
-    registerText.setCharacterSize(20);
-    registerText.setFillColor(sf::Color::White);
-    registerText.setPosition(sf::Vector2f(425.f, 360.f));
+    registerText.setPosition({ 425.f, 360.f });
+
+    displayUser.setFillColor(sf::Color::Black);
+    displayUser.setPosition({ 255.f, 155.f });
+    displayPass.setFillColor(sf::Color::Black);
+    displayPass.setPosition({ 255.f, 255.f });
 }
 
-// Deja los métodos update y draw tal cual los tenías
+void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
+    if (const auto* mouseEvent = event.getIf<sf::Event::MouseButtonPressed>()) {
+        sf::Vector2f mousePos(static_cast<float>(mouseEvent->position.x), static_cast<float>(mouseEvent->position.y));
+
+        if (userBox.getGlobalBounds().contains(mousePos)) activeBox = 1;
+        else if (passBox.getGlobalBounds().contains(mousePos)) activeBox = 2;
+        else activeBox = 0;
+
+        bool isLogin = loginButton.getGlobalBounds().contains(mousePos);
+        bool isRegister = registerButton.getGlobalBounds().contains(mousePos);
+
+        if (isLogin || isRegister) {
+            sf::TcpSocket socket;
+            auto resolvedIPs = sf::Dns::resolve("127.0.0.1");
+
+            if (resolvedIPs.has_value() && !resolvedIPs->empty()) {
+
+                if (socket.connect((*resolvedIPs)[0], 50000) == sf::Socket::Status::Done) {
+
+                    sf::Packet packet;
+                    int type = isLogin ? 1 : 2;
+                    packet << type << inputUser << inputPass;
+                    socket.send(packet);
+
+                    sf::Packet respuesta;
+                    if (socket.receive(respuesta) == sf::Socket::Status::Done) {
+                        int estado;
+                        respuesta >> estado;
+
+                        if (estado == 1) {
+                            if (isLogin) std::cout << "\n[OK] Login correcto. Entrando al Lobby...\n";
+                            else std::cout << "\n[OK] Registro correcto. Ya puedes hacer Login.\n";
+                        }
+                        else {
+                            if (isLogin) std::cout << "\n[ERROR] Contrasena incorrecta o usuario no existe.\n";
+                            else std::cout << "\n[ERROR] El nickname ya esta en uso.\n";
+                        }
+                    }
+
+                }
+                else {
+                    std::cerr << "Error: Servidor offline.\n";
+                }
+            }
+         
+        }
+    }
+
+    if (const auto* textEvent = event.getIf<sf::Event::TextEntered>()) {
+        if (activeBox != 0) {
+            if (textEvent->unicode == 8) { 
+                if (activeBox == 1 && !inputUser.empty()) inputUser.pop_back();
+                else if (activeBox == 2 && !inputPass.empty()) inputPass.pop_back();
+            }
+            else if (textEvent->unicode >= 32 && textEvent->unicode < 128) {
+                if (activeBox == 1) inputUser += static_cast<char>(textEvent->unicode);
+                else inputPass += static_cast<char>(textEvent->unicode);
+            }
+            displayUser.setString(inputUser);
+            displayPass.setString(std::string(inputPass.length(), '*'));
+        }
+    }
+}
+
 void LoginMenu::update(sf::RenderWindow& window) {
-    // Aquí irá la lógica de detectar el ratón y el teclado
+    userBox.setOutlineThickness(activeBox == 1 ? 2.f : 0.f);
+    userBox.setOutlineColor(sf::Color::Cyan);
+    passBox.setOutlineThickness(activeBox == 2 ? 2.f : 0.f);
+    passBox.setOutlineColor(sf::Color::Cyan);
 }
 
 void LoginMenu::draw(sf::RenderWindow& window) {
     window.draw(titleText);
-
-    window.draw(userLabel);
-    window.draw(userBox);
-
-    window.draw(passLabel);
-    window.draw(passBox);
-
-    window.draw(loginButton);
-    window.draw(loginText);
-
-    window.draw(registerButton);
-    window.draw(registerText);
+    window.draw(userLabel); window.draw(userBox); window.draw(displayUser);
+    window.draw(passLabel); window.draw(passBox); window.draw(displayPass);
+    window.draw(loginButton); window.draw(loginText);
+    window.draw(registerButton); window.draw(registerText);
 }

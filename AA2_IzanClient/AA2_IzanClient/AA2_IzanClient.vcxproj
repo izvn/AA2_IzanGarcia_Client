@@ -141,10 +141,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="LoginMenu.cpp" />
-    <ClCompile Include="main.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-      </ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LoginMenu.h" />
