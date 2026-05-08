@@ -2,12 +2,10 @@
 
 LoginMenu::LoginMenu()
     : titleText(font), loginText(font), registerText(font), userLabel(font),
-    passLabel(font), displayUser(font), displayPass(font)
+    passLabel(font), displayUser(font), displayPass(font), loginSuccess(false), activeBox(0)
 {
-    activeBox = 0;
-
     if (!font.openFromFile("assets/arial.ttf")) {
-        std::cerr << "Error cargando fuente\n";
+        std::cerr << "Error\n";
     }
 
     titleText.setString("3 EN RAYA ONLINE");
@@ -61,9 +59,7 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
             auto resolvedIPs = sf::Dns::resolve("127.0.0.1");
 
             if (resolvedIPs.has_value() && !resolvedIPs->empty()) {
-
                 if (socket.connect((*resolvedIPs)[0], 50000) == sf::Socket::Status::Done) {
-
                     sf::Packet packet;
                     int type = isLogin ? 1 : 2;
                     packet << type << inputUser << inputPass;
@@ -73,29 +69,22 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
                     if (socket.receive(respuesta) == sf::Socket::Status::Done) {
                         int estado;
                         respuesta >> estado;
-
                         if (estado == 1) {
-                            if (isLogin) std::cout << "\n[OK] Login correcto. Entrando al Lobby...\n";
-                            else std::cout << "\n[OK] Registro correcto. Ya puedes hacer Login.\n";
+                            if (isLogin) loginSuccess = true;
+                            else std::cout << "\nRegistro correcto.\n";
                         }
                         else {
-                            if (isLogin) std::cout << "\n[ERROR] Contrasena incorrecta o usuario no existe.\n";
-                            else std::cout << "\n[ERROR] El nickname ya esta en uso.\n";
+                            std::cout << "\nError: Datos incorrectos.\n";
                         }
                     }
-
-                }
-                else {
-                    std::cerr << "Error: Servidor offline.\n";
                 }
             }
-         
         }
     }
 
     if (const auto* textEvent = event.getIf<sf::Event::TextEntered>()) {
         if (activeBox != 0) {
-            if (textEvent->unicode == 8) { 
+            if (textEvent->unicode == 8) {
                 if (activeBox == 1 && !inputUser.empty()) inputUser.pop_back();
                 else if (activeBox == 2 && !inputPass.empty()) inputPass.pop_back();
             }
@@ -122,4 +111,8 @@ void LoginMenu::draw(sf::RenderWindow& window) {
     window.draw(passLabel); window.draw(passBox); window.draw(displayPass);
     window.draw(loginButton); window.draw(loginText);
     window.draw(registerButton); window.draw(registerText);
+}
+
+bool LoginMenu::isLoginSuccessful() const {
+    return loginSuccess;
 }

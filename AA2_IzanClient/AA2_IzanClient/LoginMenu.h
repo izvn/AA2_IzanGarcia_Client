@@ -7,24 +7,17 @@
 class LoginMenu {
 private:
     sf::Font font;
-
-    sf::RectangleShape userBox;
-    sf::RectangleShape passBox;
-    sf::RectangleShape loginButton;
-    sf::RectangleShape registerButton;
-
+    sf::RectangleShape userBox, passBox, loginButton, registerButton;
     sf::Text titleText, loginText, registerText, userLabel, passLabel;
-
-    std::string inputUser;
-    std::string inputPass;
-    sf::Text displayUser;
-    sf::Text displayPass;
-
+    std::string inputUser, inputPass;
+    sf::Text displayUser, displayPass;
     int activeBox;
+    bool loginSuccess;
 
 public:
     LoginMenu();
     void handleEvent(const sf::Event& event, sf::RenderWindow& window);
     void update(sf::RenderWindow& window);
     void draw(sf::RenderWindow& window);
+    bool isLoginSuccessful() const;
 };

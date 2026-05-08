@@ -140,10 +140,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GameScreen.cpp" />
+    <ClCompile Include="LobbyMenu.cpp" />
     <ClCompile Include="LoginMenu.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GameScreen.h" />
+    <ClInclude Include="LobbyMenu.h" />
     <ClInclude Include="LoginMenu.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
