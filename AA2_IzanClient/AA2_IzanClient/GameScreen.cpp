@@ -5,6 +5,7 @@
 GameScreen::GameScreen() : titleText(font), timerText(font), roomInfoText(font), markText(font), playerInfoText(font), exitText(font) {
     if (!font.openFromFile("assets/arial.ttf")) {}
 
+    // Setup UI dimensions
     const unsigned int TITLE_SIZE = 26; const unsigned int TIMER_SIZE = 24; const unsigned int INFO_SIZE = 20;
     const float POS_MARGIN = 20.f; const float TIMER_X = 320.f;
     const float INFO_X = 580.f; const float INFO_Y = 100.f;
@@ -20,6 +21,7 @@ GameScreen::GameScreen() : titleText(font), timerText(font), roomInfoText(font),
     exitButton.setSize({ BTN_W, BTN_H }); exitButton.setPosition({ BTN_X, BTN_Y }); exitButton.setFillColor(sf::Color(0, 200, 0));
     exitText.setString("VER RANKING"); exitText.setCharacterSize(INFO_SIZE); exitText.setPosition({ BTN_X + 35.f, BTN_Y + 12.f });
 
+    // Build the 6x6 visual grid
     const float START_X = 180.f; const float START_Y = 100.f; const float CELL_SIZE = 60.f; const float OUTLINE = 2.f;
 
     for (int i = 0; i < Config::GRID_SIZE; ++i) {
@@ -32,6 +34,8 @@ GameScreen::GameScreen() : titleText(font), timerText(font), roomInfoText(font),
             board[i][j].setOutlineColor(sf::Color(80, 80, 80));
         }
     }
+
+    // Reset control variables
     for (int i = 0; i < 5; i++) { hasWon[i] = false; isDisconnected[i] = false; }
     currentTurn = 1; winnersCount = 0; piecesPlaced = 0; gameStarted = false; gameFinished = false; resultReported = false; wantToExit = false; connectedToHost = false;
 }
@@ -40,6 +44,7 @@ void GameScreen::setP2PData(const std::string& code, int id, const std::string& 
     roomCode = code; myPlayerID = id; hostIP = ip; playerNames = names; playerPoints = points;
     titleText.setString("Sala: " + roomCode + " | Jugador: " + std::to_string(myPlayerID));
 
+    // Render rival stats dynamically
     std::string info = "JUGADORES:\n\n";
     std::string symbols[] = { "[ O ]", "[ X ]", "[ # ]", "[ S ]" };
     for (int i = 0; i < 4; i++) {
@@ -47,10 +52,12 @@ void GameScreen::setP2PData(const std::string& code, int id, const std::string& 
     }
     playerInfoText.setString(info);
 
+    // Clear the board logically
     for (int i = 0; i < 5; i++) { hasWon[i] = false; isDisconnected[i] = false; }
     for (int i = 0; i < Config::GRID_SIZE; ++i) for (int j = 0; j < Config::GRID_SIZE; ++j) grid[i][j] = 0;
     currentTurn = 1; winnersCount = 0; piecesPlaced = 0; gameStarted = false; gameFinished = false; resultReported = false; wantToExit = false; standings.clear(); selector.clear();
 
+    // Start network listeners
     const int HOST_ID = 1;
     if (myPlayerID == HOST_ID) {
         for (auto* peer : peers) { peer->disconnect(); delete peer; }
@@ -66,25 +73,37 @@ void GameScreen::setP2PData(const std::string& code, int id, const std::string& 
 bool GameScreen::checkDirection(int p, int x, int y, int dx, int dy) {
     int count = 0;
     const int WIN_TARGET = Config::WIN_CONDITION;
+    // Iterate along the specified axis
     for (int i = -2; i <= 2; i++) {
         int nx = x + i * dx, ny = y + i * dy;
-        if (nx >= 0 && nx < Config::GRID_SIZE && ny >= 0 && ny < Config::GRID_SIZE && grid[nx][ny] == p) { count++; if (count == WIN_TARGET) return true; }
-        else count = 0;
-    } return false;
+        if (nx >= 0 && nx < Config::GRID_SIZE && ny >= 0 && ny < Config::GRID_SIZE && grid[nx][ny] == p) {
+            count++;
+            if (count == WIN_TARGET) return true;
+        }
+        else {
+            count = 0;
+        }
+    }
+    return false;
 }
 
 bool GameScreen::checkWinCondition(int player, int x, int y) {
+    // Evaluates horizontal, vertical, and both diagonal axes
     return checkDirection(player, x, y, 1, 0) || checkDirection(player, x, y, 0, 1) || checkDirection(player, x, y, 1, 1) || checkDirection(player, x, y, 1, -1);
 }
 
 void GameScreen::advanceTurn() {
     const int MAX_P = Config::MAX_PLAYERS;
-    do { currentTurn++; if (currentTurn > MAX_P) currentTurn = 1; } while (hasWon[currentTurn] && winnersCount < 3);
+    do {
+        currentTurn++;
+        if (currentTurn > MAX_P) currentTurn = 1;
+    } while (hasWon[currentTurn] && winnersCount < 3); // Skip spectators
     turnTimer.restart();
 }
 
 void GameScreen::broadcastState() {
-    sf::Packet statePacket; statePacket << 1 << currentTurn << winnersCount << piecesPlaced;
+    sf::Packet statePacket;
+    statePacket << 1 << currentTurn << winnersCount << piecesPlaced;
     for (int i = 1; i <= Config::MAX_PLAYERS; i++) statePacket << hasWon[i] << isDisconnected[i];
     for (int i = 0; i < Config::GRID_SIZE; ++i) for (int j = 0; j < Config::GRID_SIZE; ++j) statePacket << grid[i][j];
     statePacket << static_cast<std::uint32_t>(standings.size());
@@ -100,7 +119,8 @@ void GameScreen::applyMove(int player, int x, int y) {
     std::cout << "[JUEGO] " << playerNames[player - 1] << " (" << symbols[player - 1] << ") coloca en Fila " << x << ", Columna " << y << "\n";
 
     if (checkWinCondition(player, x, y)) {
-        hasWon[player] = true; winnersCount++; standings.push_back(playerNames[player - 1]);
+        hasWon[player] = true; winnersCount++;
+        standings.push_back(playerNames[player - 1]);
         std::cout << "[JUEGO] ¡" << playerNames[player - 1] << " gana la posicion " << winnersCount << "!\n";
     }
     const int MAX_WINNERS = 3;
@@ -108,18 +128,26 @@ void GameScreen::applyMove(int player, int x, int y) {
 }
 
 void GameScreen::sendMatchResult() {
+    // Clean up P2P sockets before talking back to Bootstrap Server
     const int HOST_ID = 1;
     if (myPlayerID == HOST_ID) {
         for (auto* peer : peers) { peer->disconnect(); delete peer; }
         for (auto* p : pendingPeers) { p->disconnect(); delete p; }
         peers.clear(); pendingPeers.clear(); p2pListener.close();
     }
-    else { hostSocket.disconnect(); }
+    else {
+        hostSocket.disconnect();
+    }
 
-    sf::TcpSocket socket; auto resolvedIPs = sf::Dns::resolve(Config::SERVER_IP);
+    sf::TcpSocket socket;
+    auto resolvedIPs = sf::Dns::resolve(Config::SERVER_IP);
     if (resolvedIPs.has_value() && !resolvedIPs->empty() && socket.connect((*resolvedIPs)[0], Config::BOOTSTRAP_PORT) == sf::Socket::Status::Done) {
-        sf::Packet p; p << Config::NET_REPORT_RESULT << roomCode;
-        for (size_t i = 0; i < 4; i++) { if (i < standings.size()) p << standings[i]; else p << "Desconectado"; }
+        sf::Packet p;
+        p << Config::NET_REPORT_RESULT << roomCode;
+        for (size_t i = 0; i < 4; i++) {
+            if (i < standings.size()) p << standings[i];
+            else p << "Desconectado"; // Fills remaining slots with Disconnected flag
+        }
         socket.send(p);
     }
 }
@@ -132,12 +160,20 @@ void GameScreen::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
         if (gameFinished && exitButton.getGlobalBounds().contains(mousePos)) { wantToExit = true; return; }
         if (!gameStarted || winnersCount >= MAX_WINNERS || hasWon[myPlayerID] || currentTurn != myPlayerID) return;
 
+        // Verify if a valid tile was clicked
         for (int i = 0; i < Config::GRID_SIZE; ++i) {
             for (int j = 0; j < Config::GRID_SIZE; ++j) {
                 if (board[i][j].getGlobalBounds().contains(mousePos) && grid[i][j] == 0) {
                     const int HOST_ID = 1;
-                    if (myPlayerID == HOST_ID) { applyMove(myPlayerID, i, j); broadcastState(); }
-                    else { sf::Packet movePacket; movePacket << 2 << myPlayerID << i << j; hostSocket.send(movePacket); }
+                    if (myPlayerID == HOST_ID) {
+                        applyMove(myPlayerID, i, j);
+                        broadcastState();
+                    }
+                    else {
+                        sf::Packet movePacket;
+                        movePacket << 2 << myPlayerID << i << j;
+                        hostSocket.send(movePacket);
+                    }
                 }
             }
         }
@@ -148,25 +184,33 @@ void GameScreen::update(sf::RenderWindow& window) {
     const int HOST_ID = 1;
     const int REQUIRED_CLIENTS = Config::MAX_PLAYERS - 1;
 
+    // --- HOST LOGIC: Accept incoming peer connections ---
     if (myPlayerID == HOST_ID && !gameStarted) {
         sf::TcpSocket* newPeer = new sf::TcpSocket();
-        if (p2pListener.accept(*newPeer) == sf::Socket::Status::Done) { newPeer->setBlocking(false); pendingPeers.push_back(newPeer); }
+        if (p2pListener.accept(*newPeer) == sf::Socket::Status::Done) {
+            newPeer->setBlocking(false); pendingPeers.push_back(newPeer);
+        }
         else { delete newPeer; }
+
         for (auto it = pendingPeers.begin(); it != pendingPeers.end(); ) {
             sf::Packet p;
             if ((*it)->receive(p) == sf::Socket::Status::Done) {
                 int type, pID;
                 if (p >> type >> pID && type == 3) {
                     selector.add(**it); peers.push_back(*it); it = pendingPeers.erase(it);
-                    if (peers.size() == REQUIRED_CLIENTS) { gameStarted = true; turnTimer.restart(); broadcastState(); } continue;
+                    if (peers.size() == REQUIRED_CLIENTS) {
+                        gameStarted = true; turnTimer.restart(); broadcastState();
+                    } continue;
                 }
             } ++it;
         }
     }
 
+    // --- CLIENT LOGIC: Connect to Host ---
     if (myPlayerID != HOST_ID && !connectedToHost) {
         if (connectRetryClock.getElapsedTime().asSeconds() > 1.0f) {
-            connectRetryClock.restart(); auto resolvedIPs = sf::Dns::resolve(hostIP);
+            connectRetryClock.restart();
+            auto resolvedIPs = sf::Dns::resolve(hostIP);
             if (resolvedIPs.has_value() && !resolvedIPs->empty()) {
                 hostSocket.setBlocking(true);
                 if (hostSocket.connect((*resolvedIPs)[0], Config::P2P_PORT_BASE, sf::milliseconds(1000)) == sf::Socket::Status::Done) {
@@ -178,9 +222,9 @@ void GameScreen::update(sf::RenderWindow& window) {
     }
 
     if (!gameStarted) {
-        if (myPlayerID == HOST_ID) timerText.setString("HOST: Esperando confirmacion... (" + std::to_string(peers.size()) + "/3)");
+        if (myPlayerID == HOST_ID) timerText.setString("HOST: Waiting peers... (" + std::to_string(peers.size()) + "/3)");
         else {
-            timerText.setString(connectedToHost ? "Conectado. Esperando partida..." : "Llamando al Host...");
+            timerText.setString(connectedToHost ? "Connected. Waiting start..." : "Calling Host...");
             if (connectedToHost) {
                 sf::Packet p;
                 if (hostSocket.receive(p) == sf::Socket::Status::Done) {
@@ -189,7 +233,8 @@ void GameScreen::update(sf::RenderWindow& window) {
                         p >> currentTurn >> winnersCount >> piecesPlaced;
                         for (int i = 1; i <= Config::MAX_PLAYERS; i++) p >> hasWon[i] >> isDisconnected[i];
                         for (int i = 0; i < Config::GRID_SIZE; ++i) for (int j = 0; j < Config::GRID_SIZE; ++j) p >> grid[i][j];
-                        std::uint32_t stSize; if (p >> stSize) { standings.clear(); for (std::uint32_t i = 0; i < stSize; i++) { std::string name; p >> name; standings.push_back(name); } }
+                        std::uint32_t stSize;
+                        if (p >> stSize) { standings.clear(); for (std::uint32_t i = 0; i < stSize; i++) { std::string name; p >> name; standings.push_back(name); } }
                         turnTimer.restart(); gameStarted = true;
                     }
                 }
@@ -198,19 +243,23 @@ void GameScreen::update(sf::RenderWindow& window) {
     }
 
     const int MAX_WINNERS = 3;
+
+    // Force turn skip if timer exceeds 20 seconds
     if (myPlayerID == HOST_ID && winnersCount < MAX_WINNERS && turnTimer.getElapsedTime().asSeconds() >= Config::TURN_TIME_LIMIT_SEC) {
         advanceTurn(); broadcastState();
     }
 
+    // Host Recibe
     if (myPlayerID == HOST_ID && selector.wait(sf::milliseconds(10))) {
         for (size_t i = 0; i < peers.size(); i++) {
             if (selector.isReady(*peers[i])) {
                 sf::Packet p; auto status = peers[i]->receive(p);
+                // Detect Alt+F4 disconnects
                 if (status == sf::Socket::Status::Disconnected) {
                     int pID = i + 2;
                     if (!isDisconnected[pID]) {
-                        isDisconnected[pID] = true; hasWon[pID] = true;
-                        std::cout << "[ALERTA] Jugador " << playerNames[pID - 1] << " desconectado. Penalizacion aplicada.\n";
+                        isDisconnected[pID] = true; hasWon[pID] = true; // Lock their turn
+                        std::cout << "[ALERTA] Jugador " << playerNames[pID - 1] << " desconectado.\n";
                         if (currentTurn == pID) { advanceTurn(); broadcastState(); }
                     }
                 }
@@ -225,6 +274,7 @@ void GameScreen::update(sf::RenderWindow& window) {
         }
     }
 
+    // Client recibe
     if (myPlayerID != HOST_ID && !gameFinished) {
         sf::Packet p;
         if (hostSocket.receive(p) == sf::Socket::Status::Done) {
@@ -233,25 +283,32 @@ void GameScreen::update(sf::RenderWindow& window) {
                 p >> currentTurn >> winnersCount >> piecesPlaced;
                 for (int i = 1; i <= Config::MAX_PLAYERS; i++) p >> hasWon[i] >> isDisconnected[i];
                 for (int i = 0; i < Config::GRID_SIZE; ++i) for (int j = 0; j < Config::GRID_SIZE; ++j) p >> grid[i][j];
-                std::uint32_t stSize; if (p >> stSize) { standings.clear(); for (std::uint32_t i = 0; i < stSize; i++) { std::string name; p >> name; standings.push_back(name); } }
+                std::uint32_t stSize;
+                if (p >> stSize) { standings.clear(); for (std::uint32_t i = 0; i < stSize; i++) { std::string name; p >> name; standings.push_back(name); } }
                 turnTimer.restart();
             }
         }
     }
 
+    // Check for match ending (3 winners, or full board tie, taking disconnected players into account)
     int discCount = 0; for (int i = 1; i <= 4; i++) if (isDisconnected[i]) discCount++;
     const int MAX_PIECES = Config::GRID_SIZE * Config::GRID_SIZE;
 
     if ((winnersCount >= MAX_WINNERS || (winnersCount + discCount >= MAX_WINNERS) || piecesPlaced >= MAX_PIECES) && !gameFinished) {
-        if (piecesPlaced >= MAX_PIECES && winnersCount < MAX_WINNERS) std::cout << "[JUEGO] Empate detectado: Tablero lleno.\n";
+        if (piecesPlaced >= MAX_PIECES && winnersCount < MAX_WINNERS) std::cout << "[JUEGO] Empate: Tablero lleno.\n";
+
+        // Append active losers to the standings list
         for (int i = 1; i <= 4; i++) {
             bool yaEsta = false; for (auto& s : standings) if (s == playerNames[i - 1]) yaEsta = true;
             if (!yaEsta && !isDisconnected[i]) standings.push_back(playerNames[i - 1]);
         }
+        // Penalize disconnected players by forcing them to the last places
         for (int i = 1; i <= 4; i++) if (isDisconnected[i]) standings.push_back(playerNames[i - 1]);
+
         gameFinished = true;
     }
 
+    // UI Updates based on final state
     if (gameFinished && !resultReported) {
         sendMatchResult(); resultReported = true;
         timerText.setString("PARTIDA FINALIZADA"); timerText.setFillColor(sf::Color::Green);
@@ -262,7 +319,7 @@ void GameScreen::update(sf::RenderWindow& window) {
             int timeRemaining = Config::TURN_TIME_LIMIT_SEC - static_cast<int>(turnTimer.getElapsedTime().asSeconds());
             if (timeRemaining < 0) timeRemaining = 0;
             if (currentTurn == myPlayerID) { timerText.setString("TU TURNO! Quedan: " + std::to_string(timeRemaining) + "s"); timerText.setFillColor(sf::Color::Green); }
-            else { timerText.setString("Turno del Jugador " + std::to_string(currentTurn)); timerText.setFillColor(sf::Color::Yellow); }
+            else { timerText.setString("Turno Jugador " + std::to_string(currentTurn)); timerText.setFillColor(sf::Color::Yellow); }
         }
     }
 }

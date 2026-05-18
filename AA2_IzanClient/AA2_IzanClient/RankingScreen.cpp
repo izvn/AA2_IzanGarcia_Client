@@ -2,10 +2,10 @@
 #include "Config.h"
 #include <cstdint>
 
-// CONSTRUCTOR LIMPIO: Solo titleText y backText
 RankingScreen::RankingScreen() : titleText(font), backText(font), returnToLobby(false) {
     if (!font.openFromFile("assets/arial.ttf")) {}
 
+    // Table layout constants
     const float TITLE_X = 190.f; const float TITLE_Y = 30.f;
     const unsigned int TITLE_SIZE = 35;
     const float BTN_X = 300.f; const float BTN_Y = 520.f;
@@ -30,6 +30,8 @@ void RankingScreen::fetchRanking(const std::string& name) {
     myName = name;
     sf::TcpSocket socket;
     auto resolvedIPs = sf::Dns::resolve(Config::SERVER_IP);
+
+    // Query Bootstrap server for Top 10 + self
     if (resolvedIPs.has_value() && !resolvedIPs->empty()) {
         if (socket.connect((*resolvedIPs)[0], Config::BOOTSTRAP_PORT) == sf::Socket::Status::Done) {
             sf::Packet p;
@@ -64,21 +66,25 @@ void RankingScreen::update(sf::RenderWindow& window) {}
 void RankingScreen::draw(sf::RenderWindow& window) {
     window.draw(titleText);
 
+    // Draw columns at fixed X positions avoiding layout breaking
     const float X_POS = 120.f; const float X_NAME = 200.f; const float X_PTS = 400.f; const float X_W = 520.f; const float X_L = 620.f;
     const float START_Y = 100.f; const float GAP_Y = 30.f;
     const float HEADER_Y = 85.f;
     const unsigned int FONT_SIZE = 18;
     const float HIGHLIGHT_OFFSET = 20.f;
 
+    // Table Headers
     sf::Text tPos(font); tPos.setString("POS"); tPos.setCharacterSize(FONT_SIZE); tPos.setPosition({ X_POS, HEADER_Y }); tPos.setFillColor(sf::Color::Cyan); window.draw(tPos);
     sf::Text tName(font); tName.setString("NICKNAME"); tName.setCharacterSize(FONT_SIZE); tName.setPosition({ X_NAME, HEADER_Y }); tName.setFillColor(sf::Color::Cyan); window.draw(tName);
     sf::Text tPts(font); tPts.setString("PTS"); tPts.setCharacterSize(FONT_SIZE); tPts.setPosition({ X_PTS, HEADER_Y }); tPts.setFillColor(sf::Color::Cyan); window.draw(tPts);
     sf::Text tW(font); tW.setString("W"); tW.setCharacterSize(FONT_SIZE); tW.setPosition({ X_W, HEADER_Y }); tW.setFillColor(sf::Color::Cyan); window.draw(tW);
     sf::Text tL(font); tL.setString("L"); tL.setCharacterSize(FONT_SIZE); tL.setPosition({ X_L, HEADER_Y }); tL.setFillColor(sf::Color::Cyan); window.draw(tL);
 
+    // Loop through retrieved data and print each row
     for (size_t i = 0; i < rankingData.size(); ++i) {
         float y = START_Y + GAP_Y + (i * GAP_Y);
 
+        // Give a bit of margin if drawing the player outside the top 10
         const size_t TOP_LIMIT = 10;
         if (i >= TOP_LIMIT) y += HIGHLIGHT_OFFSET;
 

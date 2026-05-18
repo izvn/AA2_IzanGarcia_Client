@@ -10,6 +10,7 @@ LobbyMenu::LobbyMenu()
 {
     if (!font.openFromFile("assets/arial.ttf")) {}
 
+    // Layout
     const float TITLE_X = 190.f; const float TITLE_Y = 50.f;
     const unsigned int TITLE_SIZE = 35;
     const float BTN_W = 200.f; const float BTN_H = 60.f;
@@ -38,12 +39,13 @@ void LobbyMenu::setPlayerName(const std::string& name) { myName = name; }
 
 void LobbyMenu::reset() {
     roomCode = ""; boxActive = false; inRoom = false; waitingForPlayers = false; myPlayerID = 0;
-    displayRoomCode.setString(""); statusText.setString("Listo para una nueva partida."); statusText.setFillColor(sf::Color::Yellow);
+    displayRoomCode.setString("");
+    statusText.setString("Listo para una nueva partida."); statusText.setFillColor(sf::Color::Yellow);
     bootstrapSocket.disconnect(); bootstrapSocket.setBlocking(true);
 }
 
 void LobbyMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
-    if (waitingForPlayers) return;
+    if (waitingForPlayers) return; // Block input while searching
 
     if (const auto* mouseEvent = event.getIf<sf::Event::MouseButtonPressed>()) {
         sf::Vector2f mousePos(static_cast<float>(mouseEvent->position.x), static_cast<float>(mouseEvent->position.y));
@@ -57,6 +59,7 @@ void LobbyMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
                 statusText.setFillColor(sf::Color::Red);
             }
             else {
+                // Request server to create or join a room
                 auto resolvedIPs = sf::Dns::resolve(Config::SERVER_IP);
                 if (resolvedIPs.has_value() && !resolvedIPs->empty()) {
                     if (bootstrapSocket.connect((*resolvedIPs)[0], Config::BOOTSTRAP_PORT) == sf::Socket::Status::Done) {
@@ -66,15 +69,18 @@ void LobbyMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
 
                         bootstrapSocket.send(packet);
                         sf::Packet respuesta;
+
                         if (bootstrapSocket.receive(respuesta) == sf::Socket::Status::Done) {
                             const int SERVER_SUCCESS = 1;
                             int estado; respuesta >> estado;
+
                             if (estado == SERVER_SUCCESS) {
                                 if (isCreate) respuesta >> roomCode >> myPlayerID; else respuesta >> myPlayerID;
                                 displayRoomCode.setString(roomCode);
                                 statusText.setString("Conectado. Esperando a que se unan 4 jugadores...");
                                 statusText.setFillColor(sf::Color::Yellow);
-                                waitingForPlayers = true; bootstrapSocket.setBlocking(false);
+                                waitingForPlayers = true;
+                                bootstrapSocket.setBlocking(false); // Non-blocking to read P2P signal later
                             }
                             else {
                                 statusText.setString(isCreate ? "Error: Esa sala ya existe." : "Error: Sala no existe o esta llena.");
@@ -87,6 +93,7 @@ void LobbyMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
         }
     }
 
+    // Text field input for room code
     if (const auto* textEvent = event.getIf<sf::Event::TextEntered>()) {
         const std::uint32_t KEY_BACKSPACE = 8;
         const std::uint32_t KEY_0 = 48;
@@ -95,7 +102,9 @@ void LobbyMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
 
         if (boxActive) {
             if (textEvent->unicode == KEY_BACKSPACE && !roomCode.empty()) roomCode.pop_back();
-            else if (textEvent->unicode >= KEY_0 && textEvent->unicode <= KEY_9 && roomCode.length() < MAX_CODE_LEN) roomCode += static_cast<char>(textEvent->unicode);
+            else if (textEvent->unicode >= KEY_0 && textEvent->unicode <= KEY_9 && roomCode.length() < MAX_CODE_LEN) {
+                roomCode += static_cast<char>(textEvent->unicode);
+            }
             displayRoomCode.setString(roomCode);
         }
     }
@@ -106,6 +115,7 @@ void LobbyMenu::update(sf::RenderWindow& window) {
     const float THICKNESS_INACTIVE = 0.f;
     inputBox.setOutlineThickness(boxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE); inputBox.setOutlineColor(sf::Color::Red);
 
+    // Listens for the Server broadcasting the P2P connection data once the room hits 4 players
     if (waitingForPlayers) {
         sf::Packet packet;
         if (bootstrapSocket.receive(packet) == sf::Socket::Status::Done) {
@@ -116,10 +126,10 @@ void LobbyMenu::update(sf::RenderWindow& window) {
 
                 playerNames.clear(); playerPoints.clear();
 
+                // Read opponents data safely
                 for (int i = 0; i < Config::MAX_PLAYERS; i++) {
                     std::string pName = "Desconocido";
                     std::int32_t pPts = 0;
-
                     if (packet >> pName >> pPts) {
                         playerNames.push_back(pName);
                         playerPoints.push_back(pPts);
@@ -128,7 +138,9 @@ void LobbyMenu::update(sf::RenderWindow& window) {
 
                 statusText.setString("¡Partida Encontrada! Iniciando P2P...");
                 statusText.setFillColor(sf::Color::Green);
-                waitingForPlayers = false; inRoom = true; bootstrapSocket.disconnect();
+                waitingForPlayers = false;
+                inRoom = true;
+                bootstrapSocket.disconnect();
             }
         }
     }
@@ -140,9 +152,7 @@ void LobbyMenu::draw(sf::RenderWindow& window) {
     window.draw(statusText);
 }
 
-// ==============================================================
-// LOS GETTERS QUE ME COMÍ EN EL MENSAJE ANTERIOR ESTÁN AQUÍ
-// ==============================================================
+// Data Getters for the transition to GameScreen
 bool LobbyMenu::isRoomReady() const { return inRoom; }
 std::string LobbyMenu::getRoomCode() const { return roomCode; }
 int LobbyMenu::getPlayerID() const { return myPlayerID; }

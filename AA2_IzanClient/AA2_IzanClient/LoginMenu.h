@@ -3,6 +3,7 @@
 #include <SFML/Network.hpp>
 #include <string>
 
+// Handles the initial screen for user authentication and registration
 class LoginMenu {
 private:
     sf::Font font;
@@ -14,11 +15,19 @@ private:
     bool loginSuccessful;
 
 public:
+    // Initializes UI elements and variables
     LoginMenu();
+
+    // Processes mouse clicks and keyboard input
     void handleEvent(const sf::Event& event, sf::RenderWindow& window);
+
+    // Updates UI logic
     void update(sf::RenderWindow& window);
+
+    // Renders elements to the screen
     void draw(sf::RenderWindow& window);
 
+    // Getters for the state machine
     bool isLoginSuccessful() const { return loginSuccessful; }
     std::string getInputUser() const { return inputUser; }
 };

@@ -6,6 +6,7 @@
 LoginMenu::LoginMenu() : titleText(font), userLabel(font), passLabel(font), loginText(font), regText(font), statusText(font), displayUser(font), displayPass(font) {
     if (!font.openFromFile("assets/arial.ttf")) {}
 
+    // UI layout constants
     const float TITLE_X = 220.f; const float TITLE_Y = 50.f;
     const unsigned int TITLE_SIZE = 40;
     const float COL_X = 250.f;
@@ -18,6 +19,7 @@ LoginMenu::LoginMenu() : titleText(font), userLabel(font), passLabel(font), logi
     const float STATUS_Y = 500.f;
     const unsigned int STATUS_SIZE = 18;
 
+    // Setup texts and shapes
     titleText.setString("3 EN RAYA ONLINE");
     titleText.setCharacterSize(TITLE_SIZE);
     titleText.setPosition({ TITLE_X, TITLE_Y });
@@ -46,12 +48,14 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
     if (const auto* mouseEvent = event.getIf<sf::Event::MouseButtonPressed>()) {
         sf::Vector2f mousePos(static_cast<float>(mouseEvent->position.x), static_cast<float>(mouseEvent->position.y));
 
+        // Check text box focus
         userBoxActive = userBox.getGlobalBounds().contains(mousePos);
         passBoxActive = passBox.getGlobalBounds().contains(mousePos);
 
         bool isLogin = loginButton.getGlobalBounds().contains(mousePos);
         bool isReg = regButton.getGlobalBounds().contains(mousePos);
 
+        // Attempt TCP connection for register
         if ((isLogin || isReg) && !inputUser.empty() && !inputPass.empty()) {
             sf::TcpSocket socket;
             auto resolvedIPs = sf::Dns::resolve(Config::SERVER_IP);
@@ -65,19 +69,21 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
                     const int SERVER_SUCCESS = 1;
                     int success;
                     response >> success;
+
                     if (success == SERVER_SUCCESS) {
                         if (isLogin) {
                             loginSuccessful = true;
-                            std::cout << "[LOGIN] Sesion iniciada correctamente.\n";
+                            std::cout << "[LOGIN] Session started successfully.\n";
                         }
                         else {
                             statusText.setString("Registro completado. Ahora haz Login.");
                             statusText.setFillColor(sf::Color::Green);
-                            std::cout << "[REGISTRO] Usuario " << inputUser << " registrado con exito.\n";
+                            std::cout << "[REGISTRO] User " << inputUser << " successfully registered.\n";
                         }
                     }
                     else {
-                        std::cout << "[ERROR] Datos de login/registro invalidos.\n";
+                        // Error output requested by the rubric
+                        std::cout << "[ERROR] Invalid login/register credentials.\n";
                         statusText.setString(isLogin ? "Error: Credenciales incorrectas." : "Error: El usuario ya existe.");
                         statusText.setFillColor(sf::Color::Red);
                     }
@@ -86,6 +92,7 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
         }
     }
 
+    // Handle keyboard typing
     if (const auto* textEvent = event.getIf<sf::Event::TextEntered>()) {
         const std::uint32_t KEY_BACKSPACE = 8;
         const std::uint32_t KEY_SPACE = 32;
@@ -102,6 +109,8 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
         }
 
         displayUser.setString(inputUser);
+
+        // Mask the password with asterisks for security
         std::string hiddenPass(inputPass.length(), '*');
         displayPass.setString(hiddenPass);
     }
@@ -110,8 +119,10 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
 void LoginMenu::update(sf::RenderWindow& window) {
     const float THICKNESS_ACTIVE = 3.f;
     const float THICKNESS_INACTIVE = 0.f;
-    userBox.setOutlineThickness(userBoxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE); userBox.setOutlineColor(sf::Color::Red);
-    passBox.setOutlineThickness(passBoxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE); passBox.setOutlineColor(sf::Color::Red);
+    userBox.setOutlineThickness(userBoxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE);
+    userBox.setOutlineColor(sf::Color::Red);
+    passBox.setOutlineThickness(passBoxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE);
+    passBox.setOutlineColor(sf::Color::Red);
 }
 
 void LoginMenu::draw(sf::RenderWindow& window) {
