@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-// Handles room creation and matchmaking via the Bootstrap Server
+// Clase para crear salas o unirse a ellas y esperar a que se llenen (Matchmaking)
 class LobbyMenu {
 private:
     sf::Font font;
@@ -12,42 +12,44 @@ private:
     sf::RectangleShape createButton, joinButton, inputBox;
 
     std::string roomCode;
+    std::string matchId;
     bool boxActive;
-    bool inRoom;
-    bool waitingForPlayers;
-    int myPlayerID;
 
+    // inRoom dispara el cambio a la pantalla de juego
+    bool inRoom;
+
+    // waitingForPlayers bloquea los clicks mientras esperamos que se una gente
+    bool waitingForPlayers;
+    int myPlayerID; // Mi ID asignado por el servidor (1, 2, 3 o 4)
+
+    // Socket persistente: A diferencia del Login, aquí necesito mantener el socket 
+    // abierto mientras espero a los demás en el lobby.
     sf::TcpSocket bootstrapSocket;
+
+    // Datos que el servidor me mandará cuando la partida P2P vaya a empezar
     std::string p2pHostIP;
+    unsigned short p2pPort;
     std::vector<std::string> playerNames;
     std::vector<int> playerPoints;
 
 public:
     std::string myName;
-
-    // Initializes Lobby UI
     LobbyMenu();
 
-    // Sets the logged-in users name
     void setPlayerName(const std::string& name);
-
-    // Resets lobby state for a new search
     void reset();
 
-    // Processes interaction with room code field and buttons
     void handleEvent(const sf::Event& event, sf::RenderWindow& window);
-
-    // Listens for server readiness signal to start P2P
     void update(sf::RenderWindow& window);
-
-    // Draws UI
     void draw(sf::RenderWindow& window);
 
-    // Getters
+    // Getters masivos para inyectar toda esta info en el GameScreen (paso de variables)
     bool isRoomReady() const;
     std::string getRoomCode() const;
+    std::string getMatchId() const;
     int getPlayerID() const;
     std::string getHostIP() const;
+    unsigned short getP2PPort() const;
     std::vector<std::string> getPlayerNames() const;
-    std::vector<int> getPlayerPoints() const { return playerPoints; }
+    std::vector<int> getPlayerPoints() const;
 };

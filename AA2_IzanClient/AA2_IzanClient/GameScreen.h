@@ -1,73 +1,89 @@
 #pragma once
+
 #include <SFML/Graphics.hpp>
 #include <SFML/Network.hpp>
+
 #include <string>
 #include <vector>
+
 #include "Config.h"
 
-// Core gameplay loop, renders the 6x6 board and handles P2P connections
 class GameScreen {
 private:
     sf::Font font;
-    sf::Text titleText, timerText, roomInfoText, markText, playerInfoText;
+
+    sf::Text titleText;
+    sf::Text timerText;
+    sf::Text roomInfoText;
+    sf::Text markText;
+    sf::Text playerInfoText;
+    sf::Text exitText;
+
     sf::RectangleShape board[Config::GRID_SIZE][Config::GRID_SIZE];
-    sf::RectangleShape exitButton; sf::Text exitText;
+    sf::RectangleShape exitButton;
 
     int grid[Config::GRID_SIZE][Config::GRID_SIZE];
-    int currentTurn;
-    bool hasWon[5];
-    int winnersCount;
-    bool gameStarted;
-    int piecesPlaced;
-    sf::Clock turnTimer;
 
-    std::string roomCode; int myPlayerID; std::string hostIP;
+    int currentTurn;
+    bool hasWon[Config::MAX_PLAYERS + 1];
+    bool isDisconnected[Config::MAX_PLAYERS + 1];
+
+    int winnersCount;
+    int piecesPlaced;
+
+    bool gameStarted;
+    bool gameFinished;
+    bool resultReported;
+    bool wantToExit;
+    bool connectedToHost;
+    bool hostDisconnected;
+
+    sf::Clock turnTimer;
+    sf::Clock connectRetryClock;
+
+    std::string roomCode;
+    std::string matchId;
+    int myPlayerID;
+    std::string hostIP;
+    unsigned short p2pPort;
+
     std::vector<std::string> playerNames;
     std::vector<int> playerPoints;
-    bool isDisconnected[5];
+    std::vector<std::string> standings;
 
-    // Networking P2P variables
     sf::TcpListener p2pListener;
     std::vector<sf::TcpSocket*> peers;
     std::vector<sf::TcpSocket*> pendingPeers;
     sf::TcpSocket hostSocket;
     sf::SocketSelector selector;
 
-    bool connectedToHost;
-    sf::Clock connectRetryClock;
-    std::vector<std::string> standings;
-    bool gameFinished;
-    bool resultReported;
-    bool wantToExit;
-
-    // Evaluates if the current player has won
     bool checkWinCondition(int player, int x, int y);
+    bool checkDirection(int player, int x, int y, int dx, int dy);
 
-    // Checks consecutive marks in a given mathematical direction (dx, dy)
-    bool checkDirection(int p, int x, int y, int dx, int dy);
-
-    // Advances turn skipping spectators/disconnected players
     void advanceTurn();
-
-    // Host function to synchronize board state to all peers
     void broadcastState();
-
-    // Registers a move on the board array
     void applyMove(int player, int x, int y);
-
-    // Submits final results back to Bootstrap Server
     void sendMatchResult();
+    void closeP2PConnections();
+    void readStatePacket(sf::Packet& packet);
 
 public:
     GameScreen();
 
-    // Initializes session data from the Lobby
-    void setP2PData(const std::string& code, int id, const std::string& ip, const std::vector<std::string>& names, const std::vector<int>& points);
+    void setP2PData(
+        const std::string& code,
+        const std::string& newMatchId,
+        int id,
+        const std::string& ip,
+        unsigned short port,
+        const std::vector<std::string>& names,
+        const std::vector<int>& points
+    );
 
     void handleEvent(const sf::Event& event, sf::RenderWindow& window);
     void update(sf::RenderWindow& window);
     void draw(sf::RenderWindow& window);
 
-    bool wantsToExit() const { return wantToExit; }
-    void resetExit() { wantToExit = false; }
+    bool wantsToExit() const;
+    void resetExit();
 };

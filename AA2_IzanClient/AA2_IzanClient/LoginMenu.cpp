@@ -4,9 +4,11 @@
 #include <cstdint>
 
 LoginMenu::LoginMenu() : titleText(font), userLabel(font), passLabel(font), loginText(font), regText(font), statusText(font), displayUser(font), displayPass(font) {
+    // Si no carga la fuente, el texto de SFML peta. Siempre comprobar.
     if (!font.openFromFile("assets/arial.ttf")) {}
 
-    // UI layout constants
+    // TRUCO: Variables de diseño en constantes locales. 
+    // Así si el profe me dice "mueve este botón 10px", solo toco aquí y no busco números sueltos por el código.
     const float TITLE_X = 220.f; const float TITLE_Y = 50.f;
     const unsigned int TITLE_SIZE = 40;
     const float COL_X = 250.f;
@@ -19,7 +21,7 @@ LoginMenu::LoginMenu() : titleText(font), userLabel(font), passLabel(font), logi
     const float STATUS_Y = 500.f;
     const unsigned int STATUS_SIZE = 18;
 
-    // Setup texts and shapes
+    // Configuración de los textos y cajas (posiciones, colores, tamaños)
     titleText.setString("3 EN RAYA ONLINE");
     titleText.setCharacterSize(TITLE_SIZE);
     titleText.setPosition({ TITLE_X, TITLE_Y });
@@ -45,34 +47,42 @@ LoginMenu::LoginMenu() : titleText(font), userLabel(font), passLabel(font), logi
 }
 
 void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
+    // 1. EVENTOS DE RATÓN (Clicks)
     if (const auto* mouseEvent = event.getIf<sf::Event::MouseButtonPressed>()) {
+        // Pillo las coordenadas del click
         sf::Vector2f mousePos(static_cast<float>(mouseEvent->position.x), static_cast<float>(mouseEvent->position.y));
 
-        // Check text box focus
+        // Reviso si el click ha chocado con el "bounding box" (los límites) de mis cajas de texto.
+        // Si es así, las marco como activas para que el teclado escriba en ellas.
         userBoxActive = userBox.getGlobalBounds().contains(mousePos);
         passBoxActive = passBox.getGlobalBounds().contains(mousePos);
 
         bool isLogin = loginButton.getGlobalBounds().contains(mousePos);
         bool isReg = regButton.getGlobalBounds().contains(mousePos);
 
-        // Attempt TCP connection for register
+        // Si clico en un botón y los campos no están vacíos -> Intento conectar al Server Bootstrap (Puerto 50000)
         if ((isLogin || isReg) && !inputUser.empty() && !inputPass.empty()) {
-            sf::TcpSocket socket;
+            sf::TcpSocket socket; // Ojo: socket local que se destruirá al salir de este if
             auto resolvedIPs = sf::Dns::resolve(Config::SERVER_IP);
+
+            // Si la IP es válida y logro conectarme...
             if (resolvedIPs.has_value() && !resolvedIPs->empty() && socket.connect((*resolvedIPs)[0], Config::BOOTSTRAP_PORT) == sf::Socket::Status::Done) {
                 sf::Packet packet;
+                // Empaqueto mi código de protocolo (Login o Registro) y los datos
                 packet << (isLogin ? Config::NET_LOGIN : Config::NET_REGISTER) << inputUser << inputPass;
                 socket.send(packet);
 
                 sf::Packet response;
+                // Como este socket es BLOQUEANTE por defecto, el juego se "congela" aquí un microsegundo
+                // hasta que el server responde. Para un login está bien porque es instantáneo.
                 if (socket.receive(response) == sf::Socket::Status::Done) {
                     const int SERVER_SUCCESS = 1;
                     int success;
-                    response >> success;
+                    response >> success; // Leo la respuesta (1 = OK, 0 = FAIL)
 
                     if (success == SERVER_SUCCESS) {
                         if (isLogin) {
-                            loginSuccessful = true;
+                            loginSuccessful = true; // Gatillo para que el main.cpp cambie el estado a LOBBY
                             std::cout << "[LOGIN] Session started successfully.\n";
                         }
                         else {
@@ -82,7 +92,6 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
                         }
                     }
                     else {
-                        // Error output requested by the rubric
                         std::cout << "[ERROR] Invalid login/register credentials.\n";
                         statusText.setString(isLogin ? "Error: Credenciales incorrectas." : "Error: El usuario ya existe.");
                         statusText.setFillColor(sf::Color::Red);
@@ -92,17 +101,19 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
         }
     }
 
-    // Handle keyboard typing
+    // 2. EVENTOS DE TECLADO (Escribir)
     if (const auto* textEvent = event.getIf<sf::Event::TextEntered>()) {
         const std::uint32_t KEY_BACKSPACE = 8;
         const std::uint32_t KEY_SPACE = 32;
         const std::uint32_t KEY_TILDE = 126;
-        const size_t MAX_LEN = 15;
+        const size_t MAX_LEN = 15; // Limito a 15 caracteres para que no se salga de la caja de SFML
 
+        // Si pulso borrar y la cadena no está vacía, saco el último caracter
         if (textEvent->unicode == KEY_BACKSPACE) {
             if (userBoxActive && !inputUser.empty()) inputUser.pop_back();
             else if (passBoxActive && !inputPass.empty()) inputPass.pop_back();
         }
+        // Si es una letra normal (ASCII imprimible entre el espacio y la tilde)
         else if (textEvent->unicode >= KEY_SPACE && textEvent->unicode <= KEY_TILDE) {
             if (userBoxActive && inputUser.length() < MAX_LEN) inputUser += static_cast<char>(textEvent->unicode);
             else if (passBoxActive && inputPass.length() < MAX_LEN) inputPass += static_cast<char>(textEvent->unicode);
@@ -110,7 +121,8 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
 
         displayUser.setString(inputUser);
 
-        // Mask the password with asterisks for security
+        // DETALLE DE SEGURIDAD VISUAL: Enmascaro la contraseña.
+        // Creo un string nuevo lleno de asteriscos de la misma longitud que la password real.
         std::string hiddenPass(inputPass.length(), '*');
         displayPass.setString(hiddenPass);
     }
@@ -119,6 +131,8 @@ void LoginMenu::handleEvent(const sf::Event& event, sf::RenderWindow& window) {
 void LoginMenu::update(sf::RenderWindow& window) {
     const float THICKNESS_ACTIVE = 3.f;
     const float THICKNESS_INACTIVE = 0.f;
+
+    // Feedback visual: Le pongo un borde rojo a la caja de texto en la que estoy escribiendo.
     userBox.setOutlineThickness(userBoxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE);
     userBox.setOutlineColor(sf::Color::Red);
     passBox.setOutlineThickness(passBoxActive ? THICKNESS_ACTIVE : THICKNESS_INACTIVE);
@@ -126,6 +140,7 @@ void LoginMenu::update(sf::RenderWindow& window) {
 }
 
 void LoginMenu::draw(sf::RenderWindow& window) {
+    // Dibujo todos los rectángulos y textos capa a capa (el orden importa, el último tapa al anterior)
     window.draw(titleText);
     window.draw(userLabel); window.draw(userBox); window.draw(displayUser);
     window.draw(passLabel); window.draw(passBox); window.draw(displayPass);
